@@ -54,18 +54,25 @@
 
             <!-- Mode Selection View -->
             <section id="mode-select-view" class="view hidden">
-                <div class="mode-container">
-                    <div class="mode-card" id="select-mode-a">
-                        <h3>MODE A :: DETERMINISTIC</h3>
-                        <p>Generate consistent, stateless passwords based on your master key and site name. No storage
-                            required.</p>
-                        <button class="btn primary">[ ACTIVATE_MODE_A ]</button>
+                <div class="view-content-column">
+                    <div class="mode-tabs">
+                        <div class="tab active">// SYSTEM_MODES</div>
+                        <div class="tab" id="tab-mfa-config">[ MFA_CONFIG ]</div>
                     </div>
-                    <div class="mode-card" id="select-mode-b">
-                        <h3>MODE B :: SECURE VAULT</h3>
-                        <p>Access your encrypted database of stored credentials. Persistent storage with full
-                            management.</p>
-                        <button class="btn primary">[ ACTIVATE_MODE_B ]</button>
+                    <div class="mode-container">
+                        <div class="mode-card" id="select-mode-a">
+                            <h3>MODE A :: DETERMINISTIC</h3>
+                            <p>Generate consistent, stateless passwords based on your master key and site name. No
+                                storage
+                                required.</p>
+                            <button class="btn primary">[ ACTIVATE_MODE_A ]</button>
+                        </div>
+                        <div class="mode-card" id="select-mode-b">
+                            <h3>MODE B :: SECURE VAULT</h3>
+                            <p>Access your encrypted database of stored credentials. Persistent storage with full
+                                management.</p>
+                            <button class="btn primary">[ ACTIVATE_MODE_B ]</button>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -152,6 +159,55 @@
                             </tbody>
                         </table>
                     </div>
+                </div>
+            </section>
+
+            <!-- MFA Settings View -->
+            <section id="mfa-view" class="view hidden">
+                <div class="panel">
+                    <div class="vault-header">
+                        <h2>// MFA.CONFIG</h2>
+                        <button id="back-to-modes-mfa" class="btn secondary">[ << RETURN ]</button>
+                    </div>
+
+                    <div id="mfa-status-container" style="margin-bottom: 20px;">
+                        <p>STATUS: <span id="mfa-status-text" style="font-weight:bold;">CHECKING...</span></p>
+                    </div>
+
+                    <div id="mfa-setup-section" class="hidden">
+                        <p style="margin-bottom: 15px;">To enable 2FA, generate a seed and add it to your authenticator
+                            app.</p>
+                        <button id="mfa-generate-btn" class="btn primary">[ GENERATE_KEY ]</button>
+
+                        <div id="mfa-seed-display" class="hidden deterministic-result">
+                            <h3>>> SECRET_KEY <<< /h3>
+                                    <div id="mfa-seed-value" class="result-box" onclick="copyMFASeed()"></div>
+                                    <p class="message"
+                                        style="font-size: 0.8em; margin-top:5px; color: var(--secondary-color);">
+                                        PROVISIONING URI (FOR QR):</p>
+                                    <p id="mfa-uri-val"
+                                        style="font-size:0.7em; word-break:break-all; font-family: monospace; color: var(--text-color);">
+                                    </p>
+                        </div>
+
+                        <form id="mfa-enable-form" class="hidden"
+                            style="margin-top: 20px; border-top: 1px dashed var(--secondary-color); padding-top: 20px;">
+                            <div class="input-group">
+                                <label for="mfa-verify-otp">VERIFICATION_CODE:</label>
+                                <input type="text" id="mfa-verify-otp" placeholder="000 000" maxlength="6"
+                                    autocomplete="off">
+                            </div>
+                            <button type="submit" class="btn primary">[ ENABLE_MFA ]</button>
+                        </form>
+                    </div>
+
+                    <div id="mfa-disable-section" class="hidden">
+                        <p style="margin-bottom: 15px; color: var(--primary-color);">[ SECURE ] MFA is currently active
+                            on your account.</p>
+                        <button id="mfa-disable-btn" class="btn warning">[ DISABLE_MFA ]</button>
+                    </div>
+
+                    <div id="mfa-msg" class="message"></div>
                 </div>
             </section>
         </main>

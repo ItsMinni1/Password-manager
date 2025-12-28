@@ -201,5 +201,120 @@ def logout():
         del SESSIONS[token]
     return jsonify({"success": True})
 
+# MFA Handling
+# Token -> {"seed": "...", "timestamp": ...}
+PENDING_MFA = {}
+
+@app.route('/api/mfa/status', methods=['GET'])
+def mfa_status():
+    token = request.headers.get('Authorization')
+    sess = get_session(token)
+    if not sess:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    enabled = sess.user.get("mfa", {}).get("enabled", False)
+    return jsonify({"enabled": enabled})
+
+@app.route('/api/mfa/setup', methods=['POST'])
+def mfa_setup():
+    token = request.headers.get('Authorization')
+    sess = get_session(token)
+    if not sess:
+        return jsonify({"error": "Unauthorized"}), 401
+        
+    if spm.pyotp is None:
+        return jsonify({"error": "MFA support server-side missing (pyotp)"}), 500
+        
+    # Generate Seed
+    seed = spm.pyotp.random_base32()
+    PENDING_MFA[token] = {"seed": seed, "timestamp": time.time()}
+    
+    # Generate Provisioning URI
+    # Assuming usename is in sess.user
+    username = sess.user.get("username", "User")
+    uri = spm.pyotp.totp.TOTP(seed).provisioning_uri(name=username, issuer_name="SecurePasswordManager")
+    
+    return jsonify({
+        "seed": seed,
+        "uri": uri
+    })
+
+@app.route('/api/mfa/enable', methods=['POST'])
+def mfa_enable():
+    token = request.headers.get('Authorization')
+    sess = get_session(token)
+    if not sess:
+        return jsonify({"error": "Unauthorized"}), 401
+        
+    data = request.json
+    otp = data.get('otp')
+    if not otp:
+        return jsonify({"error": "OTP required"}), 400
+        
+    pending = PENDING_MFA.get(token)
+    if not pending:
+         return jsonify({"error": "No pending MFA setup found. Request setup first."}), 400
+         
+    # Check timestamp? 5 mins?
+    if time.time() - pending["timestamp"] > 300:
+        del PENDING_MFA[token]
+        return jsonify({"error": "MFA setup timed out. Try again."}), 400
+        
+    seed = pending["seed"]
+    totp = spm.pyotp.TOTP(seed)
+    if not totp.verify(otp, valid_window=1):
+        return jsonify({"error": "Invalid OTP code"}), 400
+        
+    # Valid! Save it.
+    # Logic adapted from spm.enableMFA
+    user = sess.user
+    
+    # Encrypt seed with auth key
+    k_auth = spm.HKDFexpand(sess.mk, info=b"auth key", length=32, salt=spm.base64decoding(user["salt"]))
+    nonce, wrapped = spm.AESGCMencrypt(k_auth, seed.encode("utf-8"))
+    
+    if "mfa" not in user:
+        user["mfa"] = {}
+        
+    user["mfa"]["wrapped_seed"] = spm.base64encoding(wrapped)
+    user["mfa"]["wrapped_nonce"] = spm.base64encoding(nonce)
+    user["mfa"]["enabled"] = True
+    
+    # Update Integrity MAC
+    mac_key = spm.HKDFexpand(sess.mk, info=b"file mac key", length=32, salt=spm.base64decoding(user["salt"]))
+    user_copy = dict(user)
+    user_copy.pop("mac", None)
+    user["mac"] = spm.base64encoding(spm.compute_hmac(mac_key, json.dumps(user_copy, sort_keys=True).encode("utf-8")))
+    
+    spm.saveUserData(user)
+    
+    # Clean up pending
+    del PENDING_MFA[token]
+    
+    return jsonify({"success": True})
+
+@app.route('/api/mfa/disable', methods=['POST'])
+def mfa_disable():
+    token = request.headers.get('Authorization')
+    sess = get_session(token)
+    if not sess:
+        return jsonify({"error": "Unauthorized"}), 401
+        
+    user = sess.user
+    if not user.get("mfa", {}).get("enabled"):
+        return jsonify({"error": "MFA not enabled"}), 400
+        
+    # Disable
+    user["mfa"] = {"enabled": False, "wrapped_seed": None, "wrapped_nonce": None}
+    
+    # Update MAC
+    mac_key = spm.HKDFexpand(sess.mk, info=b"file mac key", length=32, salt=spm.base64decoding(user["salt"]))
+    user_copy = dict(user)
+    user_copy.pop("mac", None)
+    user["mac"] = spm.base64encoding(spm.compute_hmac(mac_key, json.dumps(user_copy, sort_keys=True).encode("utf-8")))
+    
+    spm.saveUserData(user)
+    return jsonify({"success": True})
+
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

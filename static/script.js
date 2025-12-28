@@ -7,13 +7,16 @@ const views = {
     register: document.getElementById('register-view'),
     modeSelect: document.getElementById('mode-select-view'),
     deterministic: document.getElementById('deterministic-view'),
-    vault: document.getElementById('vault-view')
+    vault: document.getElementById('vault-view'),
+    mfa: document.getElementById('mfa-view')
 };
 const forms = {
     login: document.getElementById('login-form'),
     register: document.getElementById('register-form'),
     entry: document.getElementById('entry-form'),
-    deterministic: document.getElementById('deterministic-form')
+    entry: document.getElementById('entry-form'),
+    deterministic: document.getElementById('deterministic-form'),
+    mfaEnable: document.getElementById('mfa-enable-form')
 };
 const modals = {
     entry: document.getElementById('entry-modal')
@@ -158,6 +161,9 @@ document.getElementById('select-mode-b').onclick = () => {
 
 document.getElementById('back-to-modes-a').onclick = () => showView('modeSelect');
 document.getElementById('back-to-modes-b').onclick = () => showView('modeSelect');
+document.getElementById('back-to-modes-mfa').onclick = () => showView('modeSelect');
+document.getElementById('tab-mfa-config').onclick = () => initMFA();
+
 
 
 // Deterministic Logic
@@ -239,6 +245,92 @@ function renderVault(entries) {
 window.copyUser = (txt) => {
     navigator.clipboard.writeText(txt);
 };
+
+// MFA Logic
+async function initMFA() {
+    showView('mfa');
+    document.getElementById('mfa-msg').textContent = '';
+    document.getElementById('mfa-status-text').textContent = 'CHECKING...';
+    document.getElementById('mfa-status-text').style.color = 'var(--text-color)';
+
+    try {
+        const res = await apiCall('/mfa/status');
+        updateMFAUI(res.enabled);
+    } catch (err) {
+        showMessage('mfa-msg', 'FAILED TO GET STATUS: ' + err.message, true);
+    }
+}
+
+function updateMFAUI(enabled) {
+    const statusText = document.getElementById('mfa-status-text');
+    const setupSection = document.getElementById('mfa-setup-section');
+    const disableSection = document.getElementById('mfa-disable-section');
+
+    if (enabled) {
+        statusText.textContent = 'ENABLED [SECURE]';
+        statusText.style.color = 'var(--primary-color)';
+        setupSection.classList.add('hidden');
+        disableSection.classList.remove('hidden');
+    } else {
+        statusText.textContent = 'DISABLED [INSECURE]';
+        statusText.style.color = 'var(--alert-color)';
+        setupSection.classList.remove('hidden');
+        disableSection.classList.add('hidden');
+
+        // Reset setup state
+        document.getElementById('mfa-seed-display').classList.add('hidden');
+        document.getElementById('mfa-enable-form').classList.add('hidden');
+        document.getElementById('mfa-verify-otp').value = '';
+    }
+}
+
+document.getElementById('mfa-generate-btn').onclick = async () => {
+    try {
+        const res = await apiCall('/mfa/setup', 'POST');
+        document.getElementById('mfa-seed-display').classList.remove('hidden');
+        document.getElementById('mfa-seed-value').textContent = res.seed;
+        document.getElementById('mfa-uri-val').textContent = res.uri;
+        document.getElementById('mfa-enable-form').classList.remove('hidden');
+
+        // Scroll to bottom
+        document.getElementById('mfa-view').querySelector('.panel').scrollTop = 1000;
+
+        showMessage('mfa-msg', 'KEY GENERATED. ADD TO APP THEN VERIFY.', false);
+        document.getElementById('mfa-verify-otp').focus();
+    } catch (err) {
+        showMessage('mfa-msg', 'GENERATION FAILED: ' + err.message, true);
+    }
+};
+
+window.copyMFASeed = () => {
+    const text = document.getElementById('mfa-seed-value').textContent;
+    navigator.clipboard.writeText(text);
+    showMessage('mfa-msg', 'COPIED SEED TO CLIPBOARD', false);
+};
+
+forms.mfaEnable.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const otp = document.getElementById('mfa-verify-otp').value;
+    try {
+        await apiCall('/mfa/enable', 'POST', { otp });
+        showMessage('mfa-msg', 'MFA ENABLED SUCCESSFULLY!', false);
+        updateMFAUI(true);
+    } catch (err) {
+        showMessage('mfa-msg', 'ENABLE FAILED: ' + err.message, true);
+    }
+});
+
+document.getElementById('mfa-disable-btn').onclick = async () => {
+    if (!confirm("Are you sure you want to disable 2FA? This reduces security.")) return;
+    try {
+        await apiCall('/mfa/disable', 'POST');
+        showMessage('mfa-msg', 'MFA DISABLED.', true);
+        updateMFAUI(false);
+    } catch (err) {
+        showMessage('mfa-msg', 'DISABLE FAILED: ' + err.message, true);
+    }
+};
+
 
 // Event Listeners
 forms.login.addEventListener('submit', handleLogin);
