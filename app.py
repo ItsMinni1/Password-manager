@@ -7,8 +7,6 @@ from flask import Flask, request, jsonify, send_from_directory, render_template
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 
-# In-memory storage for active sessions
-# Token -> spm.Session
 SESSIONS = {}
 
 def get_session(token):
@@ -146,11 +144,6 @@ def get_vault():
         
     try:
         vault = spm.vaultLoadEntries(sess)
-        # Don't send passwords in list view for security, only when requested specifically? 
-        # Actually standard PMs verify again or just show dots. 
-        # For this API, we will just send it all but frontend can mask it.
-        # Or even better, let's just send metadata and handle password retrieval separately if we want to be fancy.
-        # But for simplicity, let's send it all.
         entries = vault.get("entries", [])
         return jsonify({"entries": entries})
     except Exception as e:
@@ -229,8 +222,6 @@ def mfa_setup():
     seed = spm.pyotp.random_base32()
     PENDING_MFA[token] = {"seed": seed, "timestamp": time.time()}
     
-    # Generate Provisioning URI
-    # Assuming usename is in sess.user
     username = sess.user.get("username", "User")
     uri = spm.pyotp.totp.TOTP(seed).provisioning_uri(name=username, issuer_name="SecurePasswordManager")
     
@@ -265,8 +256,6 @@ def mfa_enable():
     if not totp.verify(otp, valid_window=1):
         return jsonify({"error": "Invalid OTP code"}), 400
         
-    # Valid! Save it.
-    # Logic adapted from spm.enableMFA
     user = sess.user
     
     # Encrypt seed with auth key
