@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SECURE.VAULT // SYSTEM.ACCESS</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="overlay"></div>
+    <div class="scanline"></div>
+    <canvas id="binary-canvas"></canvas>
+
+    <div class="container">
+        <header>
+            <h1 class="glitch" data-text="SECURE.VAULT">Minni's Password Manager</h1>
+            <div class="status-bar">
+                <span id="connection-status">CONNECTION: SECURE</span>
+                <span id="time-display">00:00:00</span>
+                <button id="logout-btn" class="hidden">[ LOGOUT ]</button>
+            </div>
+        </header>
+
+        <main id="app-content">
+            <!-- Login View -->
+            <section id="login-view" class="view active">
+                <div class="panel login-panel">
+                    <h2>// AUTHENTICATION_REQUIRED</h2>
+                    <form id="login-form">
+                        <div class="input-group">
+                            <label for="username">USER.ID:</label>
+                            <input type="text" id="username" autocomplete="off" placeholder="ENTER USERNAME">
+                        </div>
+                        <div class="input-group">
+                            <label for="password">ACCESS.KEY:</label>
+                            <input type="password" id="password" placeholder="ENTER MASTER PASSWORD">
+                        </div>
+                        <div class="input-group hidden" id="mfa-group">
+                            <label for="otp">MFA.TOKEN:</label>
+                            <input type="text" id="otp" placeholder="000 000" maxlength="6">
+                        </div>
+                        <div class="actions">
+                            <button type="submit" class="btn primary">[ INITIATE_HANDSHAKE ]</button>
+                            <button type="button" id="show-register" class="btn secondary">[ NEW_USER_REGISTRATION
+                                ]</button>
+                        </div>
+                        <div id="login-msg" class="message"></div>
+                    </form>
+                </div>
+            </section>
+
+            <!-- Mode Selection View -->
+            <section id="mode-select-view" class="view hidden">
+                <div class="mode-container">
+                    <div class="mode-card" id="select-mode-a">
+                        <h3>MODE A :: DETERMINISTIC</h3>
+                        <p>Generate consistent, stateless passwords based on your master key and site name. No storage
+                            required.</p>
+                        <button class="btn primary">[ ACTIVATE_MODE_A ]</button>
+                    </div>
+                    <div class="mode-card" id="select-mode-b">
+                        <h3>MODE B :: SECURE VAULT</h3>
+                        <p>Access your encrypted database of stored credentials. Persistent storage with full
+                            management.</p>
+                        <button class="btn primary">[ ACTIVATE_MODE_B ]</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Deterministic View -->
+            <section id="deterministic-view" class="view hidden">
+                <div class="panel">
+                    <div class="vault-header">
+                        <h2>// DETERMINISTIC.GEN</h2>
+                        <button id="back-to-modes-a" class="btn secondary">[ << RETURN ]</button>
+                    </div>
+                    <form id="deterministic-form">
+                        <div class="input-group">
+                            <label for="det-site">TARGET_SYSTEM (SITE):</label>
+                            <input type="text" id="det-site" placeholder="example.com">
+                        </div>
+                        <div class="input-group">
+                            <label for="det-passphrase">PASSPHRASE (OPTIONAL):</label>
+                            <input type="password" id="det-passphrase" placeholder="Extra salt...">
+                        </div>
+                        <div class="input-group">
+                            <label for="det-length">LENGTH:</label>
+                            <input type="number" id="det-length" value="16" min="8" max="64">
+                        </div>
+                        <div class="actions">
+                            <button type="submit" class="btn primary">[ COMPUTE_HASH ]</button>
+                        </div>
+                    </form>
+                    <div id="det-result-container" class="hidden deterministic-result">
+                        <h3>>> RESULTING_KEY <<< /h3>
+                                <div id="det-result" class="result-box" onclick="copyResult()"></div>
+                                <div id="det-msg" class="message"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Register View -->
+            <section id="register-view" class="view hidden">
+                <div class="panel">
+                    <h2>// SYSTEM.REGISTRATION</h2>
+                    <form id="register-form">
+
+                        <div class="input-group">
+                            <label for="reg-username">NEW USER.ID:</label>
+                            <input type="text" id="reg-username" autocomplete="off" placeholder="CREATE USERNAME">
+                        </div>
+                        <div class="input-group">
+                            <label for="reg-password">NEW ACCESS.KEY:</label>
+                            <input type="password" id="reg-password" placeholder="MIN 12 CHARACTERS">
+                        </div>
+                        <div class="actions">
+                            <button type="submit" class="btn primary">[ CREATE_IDENTITY ]</button>
+                            <button type="button" id="show-login" class="btn secondary">[ RETURN_TO_AUTH ]</button>
+                        </div>
+                        <div id="reg-msg" class="message"></div>
+                    </form>
+                </div>
+            </section>
+
+            <!-- Vault Dashboard -->
+            <section id="vault-view" class="view hidden">
+                <div class="panel full-width">
+                    <div class="vault-header">
+                        <h2>// DATA.ARCHIVE</h2>
+                        <div class="vault-actions">
+                            <button id="back-to-modes-b" class="btn secondary">[ << RETURN ]</button>
+                                    <input type="text" id="search-box" placeholder="SEARCH_QUERY...">
+                                    <button id="add-entry-btn" class="btn primary">[ + ADD_RECORD ]</button>
+                        </div>
+                    </div>
+                    <div class="vault-list-container">
+                        <table class="vault-table">
+                            <thead>
+                                <tr>
+                                    <th>TARGET_SYSTEM</th>
+                                    <th>USER_IDENTITY</th>
+                                    <th>ACCESS_CODE</th>
+                                    <th>ENCRYPTED_NOTES</th>
+                                    <th>ACTION</th>
+                                </tr>
+                            </thead>
+                            <tbody id="vault-list">
+                                <!-- Entries injected here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <div class="terminal-footer">
+                > SYSTEM_READY
+            </div>
+        </footer>
+    </div>
+
+    <!-- Add Entry Modal -->
+    <div id="entry-modal" class="modal hidden">
+        <div class="modal-content panel">
+            <h3>// NEW_ARCHIVE_ENTRY</h3>
+            <form id="entry-form">
+                <div class="input-group">
+                    <label>TARGET_SYSTEM:</label>
+                    <input type="text" id="new-site" placeholder="example.com">
+                </div>
+                <div class="input-group">
+                    <label>USER_IDENTITY:</label>
+                    <input type="text" id="new-login" placeholder="username/email">
+                </div>
+                <div class="input-group">
+                    <label>ACCESS.KEY:</label>
+                    <div class="row">
+                        <input type="text" id="new-password" placeholder="LEAVE EMPTY TO GENERATE">
+                        <button type="button" id="gen-pass" class="btn small">[ GEN ]</button>
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label>NOTES:</label>
+                    <input type="text" id="new-notes" placeholder="OPTIONAL_DATA">
+                </div>
+                <div class="actions">
+                    <button type="submit" class="btn primary">[ COMMIT ]</button>
+                    <button type="button" id="cancel-entry" class="btn warning">[ ABORT ]</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="/static/script.js"></script>
+</body>
+
+</html>
